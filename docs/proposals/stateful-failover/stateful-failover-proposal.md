@@ -18,7 +18,7 @@ create-date: 2024-06-28
 
 ## Summary
 
-Karmada can be currently used to intelligently schedule all types of resources (both generic Kubernetes objects as well as user-applied CRDs). It is particularly useful for ensuring application resilience in a multi-cluster environment in which applications may be rescheduled if a cluster becomes healthy.
+Karmada can be currently used to intelligently schedule all types of resources (both generic Kubernetes objects as well as user-applied CRDs). It is particularly useful for ensuring stateful application resilience in a multi-cluster environment in which applications may be rescheduled if a cluster becomes healthy.
 
 However, Karmada’s scheduling logic runs on the assumption that resources that are scheduled and rescheduled are stateless. In some cases, users may desire to conserve a certain state so that applications can resume from where they left off in the previous cluster. 
 
@@ -47,6 +47,8 @@ To enable this we would need:
 
 Since stateful applications have different implementations of how to retrieve the last state given this the job metadata we would then rely on those individual implementations to fetch all the details related to the last state.
 
+**NOTE: POINT TO BE DISCUSSED**
+
 One important detail is that if you are not migrating all the replicas of your stateful application together, it is not clear when the state needs to be restored. In this proposal we focus on the use case where all the replicas of a stateful application are migrated together.
 
 
@@ -66,7 +68,7 @@ upgradeMode: savepoint
 state: running
 ```
 
-We currently use Kyverno along with a custom microservice to retrieve the last state from the persistent store and mutate the CRD spec to to include the above details.
+We currently use a mutating webhook (Kyverno) along with a custom microservice to retrieve the last state from the persistent store and mutate the CRD spec to to include the above details.
 
 We believe that Karmada would benefit from having a generic way to store the job metadata/information required for failover and a label/annotation to indicate that failover has happened so that this can be extended to any stateful application.
 
@@ -120,11 +122,11 @@ type FailoverHistoryItem struct {
     // It is represented in RFC3339 form(like '2021-04-25T10:02:10Z') and is in UTC
 	FailoverTime *metav1.Time `json:"failoverTime,omitempty"`
 
-    // clusterFailedFrom represents the cluster name from which the workload failed over from
-	clusterFailedFrom string `json:"clusterFailedFrom,omitempty"`
+    // OriginCluster represents the cluster name from which the workload failed over from
+	OriginCluster string `json:"originCluster,omitempty"`
 
-    // clusterFailedTo represents the cluster name from which the workload failed over to
-	clusterFailedTo string `json:"clusterFailedTo,omitempty"`
+    // DestinationCluster represents the cluster name from which the workload failed over to
+	DestinationCluster string `json:"destinationCluster,omitempty"`
 
     // PersistedDuringFailover contains the fields required by the stateful application to resume from that state after failover
 	PersistedDuringFailover []PersistedFailoverItem `json:"persistedFailoverItem,omitempty"` 
@@ -137,16 +139,16 @@ The FailoverHistoryItem object contains information relevant to a failover and a
 type PersistedDuringFailover struct {
 	
     // LabelName represents the name of the line that will be persisted for the replica
-    // in case there is a failover to a new cluster. LabelName string `json:"labelName,omitempty"`
-	labelName string `json:"labelName,omitempty"`
+    // in case there is a failover to a new cluster.
+	LabelName string `json:"labelName,omitempty"`
 
     // PersistedItem is a pointer to the status item that should be persisted to the rescheduled 
     // replica during a failover. This should be input in the form: obj.status.<path-to-item> 
-	PersistedStatusItem string `json:"PersistedStatusItem,omitempty"`
+	PersistedStatusItem string `json:"persistedStatusItem,omitempty"`
 }
 ```
 
-The PersistedDuringFailover object keeps track of the value of a field during failover so that this information can be used to resume processing from this point onward. This object consists of two fields, labelName and PersistedStatusItem which are both defined in the propogation policy.
+The PersistedDuringFailover object keeps track of the value of a field during failover so that this information can be used to resume processing from this point onward. This object consists of two fields, LabelName and PersistedStatusItem which are both defined in the propogation policy.
 
 PropagationPolicy API Change
 
@@ -168,9 +170,9 @@ spec:
         tolerationSeconds: 90
       purgeMode: Graciously
       gracePeriodSeconds: 10
-	persistedFields.maxHistory: 5
-	persistedFields.fields: 
-	- labelName: jobID
+    persistedFields.maxHistory: 5
+    persistedFields.fields:
+	- LabelName: jobID
 	  PersistedStatusItem: obj.status.jobStatus.jobID
   resourceSelectors:
     - apiVersion: flink.apache.org/v1beta1
@@ -185,5 +187,4 @@ spec:
       - spreadByField: cluster
         maxGroups: 1
         minGroups: 1
-
 ```
