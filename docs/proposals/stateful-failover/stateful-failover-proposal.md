@@ -45,11 +45,18 @@ To enable this we would need:
 - A mechanism for when a failover happened so that stateful applications can load the previous state first before resuming processing.
 - At the very minimum, a way of storing and reading state/metadata related to the job being failed over.
 
-Since stateful applications have different implementations of how to retrieve the last state given this the job metadata we would then rely on those individual implementations to fetch all the details related to the last state.
+Since stateful applications have different implementations of how to retrieve the last state given this the job metadata we would then rely on those individual implementations to fetch all the details related to the last state. 
 
-**NOTE: POINT TO BE DISCUSSED**
+**NOTE: To be discussed with Karmada community**
 
-One important detail is that if you are not migrating all the replicas of your stateful application together, it is not clear when the state needs to be restored. In this proposal we focus on the use case where all the replicas of a stateful application are migrated together.
+One important detail is that if all the replicas of the stateful application are not migrated together, it is not clear when the state needs to be restored. In this proposal we focus on the use case where all the replicas of a stateful application are migrated together. One way to ensure this is to make all the replicas scheduled together using spreadConstraints.
+
+```
+spreadConstraints:
+      - spreadByField: cluster
+        maxGroups: 1
+        minGroups: 1
+```
 
 
 ### Use-case with Flink:
@@ -172,8 +179,8 @@ spec:
       gracePeriodSeconds: 10
     persistedFields.maxHistory: 5
     persistedFields.fields:
-	- LabelName: jobID
-	  PersistedStatusItem: obj.status.jobStatus.jobID
+      - LabelName: jobID
+        PersistedStatusItem: obj.status.jobStatus.jobID
   resourceSelectors:
     - apiVersion: flink.apache.org/v1beta1
       kind: FlinkDeployment
