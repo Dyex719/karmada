@@ -154,9 +154,27 @@ func mergeTargetClusters(targetClusters []workv1alpha2.TargetCluster, requiredBy
 	return targetClusters
 }
 
+func checkFailoverCondition(resourceBinding *workv1alpha2.ResourceBinding) bool {
+	conditions := resourceBinding.Status.Conditions
+	for _, condition := range conditions {
+		klog.V(4).Info("Checking condition: %s", condition.Message)
+		if condition.Type == workv1alpha2.EvictionReasonTaintUntolerated {
+			return true
+		}
+
+	}
+	return false
+}
+
 func mergeLabel(workload *unstructured.Unstructured, binding metav1.Object, scope apiextensionsv1.ResourceScope) map[string]string {
 	var workLabel = make(map[string]string)
 	if scope == apiextensionsv1.NamespaceScoped {
+		klog.V(4).Info("Checking for failover condition.")
+		namespaceBindingObj := binding.(*workv1alpha2.ResourceBinding)
+		if checkFailoverCondition(namespaceBindingObj) {
+			klog.V(4).Info("Appending cluster failover label!")
+			util.MergeLabel(workload, "resourcebinding.karmada.io/clusterFailover", "true")
+		}
 		bindingID := util.GetLabelValue(binding.GetLabels(), workv1alpha2.ResourceBindingPermanentIDLabel)
 		util.MergeLabel(workload, workv1alpha2.ResourceBindingPermanentIDLabel, bindingID)
 		workLabel[workv1alpha2.ResourceBindingPermanentIDLabel] = bindingID

@@ -19,13 +19,17 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -137,6 +141,55 @@ func (tc *NoExecuteTaintManager) Start(ctx context.Context) error {
 	return nil
 }
 
+func (tc *NoExecuteTaintManager) updateFailoverStatus(binding *workv1alpha2.ResourceBinding, cluster string) (err error) {
+	message := fmt.Sprintf("Failover triggered for replica on cluster %s", cluster)
+	newFailoverAppliedCondition := metav1.Condition{
+		Type:               workv1alpha2.EvictionReasonTaintUntolerated,
+		Status:             metav1.ConditionTrue,
+		Reason:             "ClusterFailoverSuccessful",
+		Message:            message,
+		LastTransitionTime: metav1.Now(),
+	}
+
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() (err error) {
+		currentTime := metav1.Now()
+		binding.Status.FailoverHistory = append(binding.Status.FailoverHistory, workv1alpha2.FailoverHistoryItem{
+			FailoverTime:  &currentTime,
+			OriginCluster: cluster,
+		})
+		bindingStatus := binding.Status.DeepCopy()
+		meta.SetStatusCondition(&binding.Status.Conditions, newFailoverAppliedCondition)
+		if reflect.DeepEqual(*bindingStatus, binding.Status) {
+			return nil
+		}
+
+		klog.V(4).Info("Calling K8s cluster to update status...")
+
+		updateErr := tc.Client.Status().Update(context.TODO(), binding)
+		if updateErr == nil {
+			klog.V(4).Info("Called K8s cluster to update status!")
+			return nil
+		}
+
+		klog.V(4).Info("Verifying the update was persisted...")
+
+		updated := &workv1alpha2.ResourceBinding{}
+		if err = tc.Client.Get(context.TODO(), client.ObjectKey{Namespace: binding.GetNamespace(), Name: binding.GetName()}, updated); err == nil {
+			klog.V(4).Info("Found binding...")
+			binding = updated.DeepCopy()
+		} else {
+			klog.Errorf("Failed to get updated resource binding %s/%s: %v", binding.GetNamespace(), binding.GetName(), err)
+		}
+		return updateErr
+	})
+
+	if err != nil {
+		return err
+	}
+	return nil
+
+}
+
 func (tc *NoExecuteTaintManager) syncBindingEviction(key util.QueueKey) error {
 	fedKey, ok := key.(keys.FederatedKey)
 	if !ok {
@@ -170,6 +223,11 @@ func (tc *NoExecuteTaintManager) syncBindingEviction(key util.QueueKey) error {
 	// Case 2: Need eviction after toleration time. If time is up, do eviction right now.
 	// Case 3: Tolerate forever, we do nothing.
 	if needEviction || tolerationTime == 0 {
+		klog.V(4).Info("AD: Updating resource binding: %s with latest failover information %s.", binding.Name, cluster)
+		updateerr := tc.updateFailoverStatus(binding, cluster)
+		if updateerr != nil {
+			klog.Errorf("AD: Failed to update status with failover information")
+		}
 		// update final result to evict the target cluster
 		if features.FeatureGate.Enabled(features.GracefulEviction) {
 			binding.Spec.GracefulEvictCluster(cluster, workv1alpha2.NewTaskOptions(workv1alpha2.WithProducer(workv1alpha2.EvictionProducerTaintManager), workv1alpha2.WithReason(workv1alpha2.EvictionReasonTaintUntolerated)))
