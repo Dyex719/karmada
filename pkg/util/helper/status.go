@@ -37,21 +37,26 @@ import (
 // Changes to the status sub-resource will only be applied if the object
 // already exist.
 func UpdateStatus(ctx context.Context, c client.Client, obj client.Object, f controllerutil.MutateFn) (controllerutil.OperationResult, error) {
+	fmt.Printf("AD: binding1: %+v", obj)
 	key := client.ObjectKeyFromObject(obj)
 	if err := c.Get(ctx, key, obj); err != nil {
+		fmt.Printf("Error is %s", err)
 		return controllerutil.OperationResultNone, err
 	}
-
+	fmt.Printf("AD: binding2: %+v", obj)
 	existing := obj.DeepCopyObject()
 	if err := mutate(f, key, obj); err != nil {
+		fmt.Printf("Error is %s", err)
 		return controllerutil.OperationResultNone, err
 	}
-
+	fmt.Printf("AD: binding3: %+v", obj)
 	if equality.Semantic.DeepEqual(existing, obj) {
+		fmt.Printf("AD: EQUAL")
 		return controllerutil.OperationResultNone, nil
 	}
-
+	fmt.Printf("AD: binding4: %+v", obj)
 	if err := c.Status().Update(ctx, obj); err != nil {
+		fmt.Printf("Error is %s", err)
 		return controllerutil.OperationResultNone, err
 	}
 	return controllerutil.OperationResultUpdatedStatusOnly, nil

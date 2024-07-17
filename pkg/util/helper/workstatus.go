@@ -76,7 +76,15 @@ func AggregateResourceBindingWorkStatus(
 	var operationResult controllerutil.OperationResult
 	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		operationResult, err = UpdateStatus(context.Background(), c, binding, func() error {
+			fmt.Printf("AggregateStatus is %+v", aggregatedStatuses)
 			binding.Status.AggregatedStatus = aggregatedStatuses
+			currentTime := metav1.Now()
+			failoverHistoryItem := workv1alpha2.FailoverHistoryItem{
+				FailoverTime:  &currentTime,
+				OriginCluster: "WORKSTATUS",
+			}
+			binding.Status.FailoverHistory = []workv1alpha2.FailoverHistoryItem{failoverHistoryItem}
+			fmt.Printf("Failover history is %+v", binding.Status.FailoverHistory)
 			// set binding status with the newest condition
 			meta.SetStatusCondition(&binding.Status.Conditions, fullyAppliedCondition)
 			return nil

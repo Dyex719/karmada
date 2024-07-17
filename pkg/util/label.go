@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -71,6 +72,7 @@ func MergeLabel(obj metav1.Object, labelKey string, labelValue string) {
 		labels = make(map[string]string, 1)
 	}
 	labels[labelKey] = labelValue
+	fmt.Printf("The labels are %+v", labels)
 	obj.SetLabels(labels)
 }
 

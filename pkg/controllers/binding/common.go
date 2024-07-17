@@ -17,6 +17,7 @@ limitations under the License.
 package binding
 
 import (
+	"fmt"
 	"strconv"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -120,6 +121,8 @@ func ensureWork(
 			return err
 		}
 
+		fmt.Println("Worklabel is %+v", workLabel)
+
 		workMeta := metav1.ObjectMeta{
 			Name:        names.GenerateWorkName(clonedWorkload.GetKind(), clonedWorkload.GetName(), clonedWorkload.GetNamespace()),
 			Namespace:   workNamespace,
@@ -173,7 +176,9 @@ func mergeLabel(workload *unstructured.Unstructured, binding metav1.Object, scop
 		namespaceBindingObj := binding.(*workv1alpha2.ResourceBinding)
 		if checkFailoverCondition(namespaceBindingObj) {
 			klog.V(4).Info("Appending cluster failover label!")
+			fmt.Printf("Workload is %+v", workload)
 			util.MergeLabel(workload, "resourcebinding.karmada.io/clusterFailover", "true")
+			workLabel["resourcebinding.karmada.io/clusterFailover"] = "true"
 		}
 		bindingID := util.GetLabelValue(binding.GetLabels(), workv1alpha2.ResourceBindingPermanentIDLabel)
 		util.MergeLabel(workload, workv1alpha2.ResourceBindingPermanentIDLabel, bindingID)

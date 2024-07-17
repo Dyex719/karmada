@@ -19,7 +19,6 @@ package cluster
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/klog/v2"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	clusterv1alpha1 "github.com/karmada-io/karmada/pkg/apis/cluster/v1alpha1"
@@ -151,43 +151,69 @@ func (tc *NoExecuteTaintManager) updateFailoverStatus(binding *workv1alpha2.Reso
 		LastTransitionTime: metav1.Now(),
 	}
 
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() (err error) {
-		currentTime := metav1.Now()
-		binding.Status.FailoverHistory = append(binding.Status.FailoverHistory, workv1alpha2.FailoverHistoryItem{
-			FailoverTime:  &currentTime,
-			OriginCluster: cluster,
+	// err = retry.RetryOnConflict(retry.DefaultRetry, func() (err error) {
+	// 	currentTime := metav1.Now()
+	// 	binding.Status.FailoverHistory = append(binding.Status.FailoverHistory, workv1alpha2.FailoverHistoryItem{
+	// 		FailoverTime:  &currentTime,
+	// 		OriginCluster: cluster,
+	// 	})
+	// 	bindingStatus := binding.Status.DeepCopy()
+	// 	meta.SetStatusCondition(&binding.Status.Conditions, newFailoverAppliedCondition)
+	// 	if reflect.DeepEqual(*bindingStatus, binding.Status) {
+	// 		return nil
+	// 	}
+
+	// 	klog.V(4).Info("Calling K8s cluster to update status...")
+
+	// 	updateErr := tc.Client.Status().Update(context.TODO(), binding)
+	// 	if updateErr == nil {
+	// 		klog.V(4).Info("Called K8s cluster to update status!")
+	// 		return nil
+	// 	}
+
+	// 	klog.V(4).Info("Verifying the update was persisted...")
+
+	// 	updated := &workv1alpha2.ResourceBinding{}
+	// 	if err = tc.Client.Get(context.TODO(), client.ObjectKey{Namespace: binding.GetNamespace(), Name: binding.GetName()}, updated); err == nil {
+	// 		klog.V(4).Info("Found binding...")
+	// 		binding = updated.DeepCopy()
+	// 	} else {
+	// 		klog.Errorf("Failed to get updated resource binding %s/%s: %v", binding.GetNamespace(), binding.GetName(), err)
+	// 	}
+	// 	return updateErr
+	// })
+
+	// if err != nil {
+	// 	return err
+	// }
+	// return nil
+
+	var operationResult controllerutil.OperationResult
+	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		operationResult, err = helper.UpdateStatus(context.Background(), tc, binding, func() error {
+			currentTime := metav1.Now()
+			failoverHistoryItem := workv1alpha2.FailoverHistoryItem{
+				FailoverTime:  &currentTime,
+				OriginCluster: "TAINT",
+			}
+			binding.Status.FailoverHistory = []workv1alpha2.FailoverHistoryItem{failoverHistoryItem}
+			fmt.Printf("Failover history is %+v", binding.Status.FailoverHistory)
+			// set binding status with the newest condition
+			meta.SetStatusCondition(&binding.Status.Conditions, newFailoverAppliedCondition)
+			return nil
 		})
-		bindingStatus := binding.Status.DeepCopy()
-		meta.SetStatusCondition(&binding.Status.Conditions, newFailoverAppliedCondition)
-		if reflect.DeepEqual(*bindingStatus, binding.Status) {
-			return nil
-		}
-
-		klog.V(4).Info("Calling K8s cluster to update status...")
-
-		updateErr := tc.Client.Status().Update(context.TODO(), binding)
-		if updateErr == nil {
-			klog.V(4).Info("Called K8s cluster to update status!")
-			return nil
-		}
-
-		klog.V(4).Info("Verifying the update was persisted...")
-
-		updated := &workv1alpha2.ResourceBinding{}
-		if err = tc.Client.Get(context.TODO(), client.ObjectKey{Namespace: binding.GetNamespace(), Name: binding.GetName()}, updated); err == nil {
-			klog.V(4).Info("Found binding...")
-			binding = updated.DeepCopy()
-		} else {
-			klog.Errorf("Failed to get updated resource binding %s/%s: %v", binding.GetNamespace(), binding.GetName(), err)
-		}
-		return updateErr
-	})
-
-	if err != nil {
+		return err
+	}); err != nil {
+		fmt.Printf("AD: Error is %s", err)
 		return err
 	}
-	return nil
 
+	fmt.Println("AD: OperationalResult")
+	fmt.Println(operationResult)
+	if operationResult == controllerutil.OperationResultUpdatedStatusOnly {
+		fmt.Sprintf("Update ResourceBinding(%s/%s) with FailoverHistory successfully.", binding.Namespace, binding.Name)
+	}
+	return nil
 }
 
 func (tc *NoExecuteTaintManager) syncBindingEviction(key util.QueueKey) error {
