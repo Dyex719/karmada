@@ -692,7 +692,7 @@ function util::get_macos_ipaddress() {
 }
 
 function util::get_version() {
-  git describe --tags --dirty
+  git describe --tags --dirty=-dirty8
 }
 
 function util::version_ldflags() {

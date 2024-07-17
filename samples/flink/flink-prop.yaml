@@ -1,7 +1,7 @@
 apiVersion: policy.karmada.io/v1alpha1
 kind: PropagationPolicy
 metadata:
-  name: nginx-propagation
+  name: flinkdep-policy
 spec:
   failover:
     application:
@@ -10,21 +10,15 @@ spec:
       purgeMode: Graciously
       gracePeriodSeconds: 10    
   resourceSelectors:
-    - apiVersion: apps/v1
-      kind: Deployment
-      name: nginx
+    - apiVersion: flink.apache.org/v1beta1
+      kind: FlinkDeployment
+      namespace: s-spaaseng
   propagateDeps: true
   placement:
-    clusterAffinity:
-      clusterNames:
-        - member1
-        - member2
-    replicaScheduling:
+    replicaScheduling: 
       replicaDivisionPreference: Aggregated
       replicaSchedulingType: Divided
     spreadConstraints:
       - spreadByField: cluster
         maxGroups: 1
         minGroups: 1
-
-      

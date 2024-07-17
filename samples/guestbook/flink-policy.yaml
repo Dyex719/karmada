@@ -1,0 +1,22 @@
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: flink-new-policy
+spec:
+  resourceSelectors:
+    - apiVersion: flink.apache.org/v1beta1
+      kind: FlinkDeployment
+  placement:
+    clusterAffinity:
+      clusterNames:
+        - member1
+        - member2
+    replicaScheduling:
+      replicaDivisionPreference: Aggregated 
+      replicaSchedulingType: Divided
+    spreadConstraints:
+      - spreadByField: cluster
+        maxGroups: 1 
+        minGroups: 1
+
+

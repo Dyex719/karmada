@@ -3,22 +3,13 @@ GOARCH ?= $(shell go env GOARCH)
 VERSION ?= '$(shell hack/version.sh)'
 
 # Images management
-REGISTRY?="docker.io/karmada"
+REGISTRY?="localhost:5001/karmada"
 REGISTRY_USER_NAME?=""
 REGISTRY_PASSWORD?=""
-REGISTRY_SERVER_ADDRESS?=""
+REGISTRY_SERVER_ADDRESS?="localhost:5001"
 
-TARGETS := karmada-aggregated-apiserver \
-			karmada-controller-manager \
-			karmada-scheduler \
-			karmada-descheduler \
-			karmada-webhook \
-			karmada-agent \
-			karmada-scheduler-estimator \
-			karmada-interpreter-webhook-example \
-			karmada-search \
-			karmada-operator \
-			karmada-metrics-adapter
+TARGETS := karmada-controller-manager
+
 
 CTL_TARGETS := karmadactl kubectl-karmada
 

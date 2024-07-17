@@ -1,0 +1,54 @@
+apiVersion: config.karmada.io/v1alpha1
+kind: ResourceInterpreterCustomization
+metadata:
+  name: flinkdeployment-interpreter
+spec:
+  target:
+    apiVersion: flink.apache.org/v1beta1
+    kind: FlinkDeployment
+  customizations:
+    replicaResource:
+      luaScript: >
+        local kube = require("kube")
+
+        local function isempty(s)
+          return s == nil or s == ''
+        end
+
+        function GetReplicas(observedObj)
+          replica = 1
+          requires = {
+            resourceRequest = {},
+          }
+          -- Add jobmanager resources into replica requirement
+
+          jm_replicas = observedObj.spec.jobManager.replicas
+          if isempty(jm_replicas) then
+            jm_replicas = 1
+          end
+
+          for i = 1, jm_replicas do
+            requires.resourceRequest.cpu = kube.resourceAdd(requires.resourceRequest.cpu, tostring(observedObj.spec.jobManager.resource.cpu))
+            requires.resourceRequest.memory = kube.resourceAdd(requires.resourceRequest.memory, observedObj.spec.jobManager.resource.memory)
+          end
+
+          -- Add task manager resources into replica requirement
+
+          parallelism = observedObj.spec.job.parallelism
+          tms = math.ceil(parallelism / observedObj.spec.flinkConfiguration['taskmanager.numberOfTaskSlots'])
+
+          for i = 1, tms do
+            requires.resourceRequest.cpu = kube.resourceAdd(requires.resourceRequest.cpu, tostring(observedObj.spec.taskManager.resource.cpu))
+            requires.resourceRequest.memory = kube.resourceAdd(requires.resourceRequest.memory, observedObj.spec.taskManager.resource.memory)
+          end
+
+          requires.namespace = observedObj.metadata.namespace
+          requires.priorityClassName = 'spaas-free'
+
+          return replica, requires
+        end
+    healthInterpretation:
+      luaScript: >
+        function InterpretHealth(observedObj)
+          return observedObj.status.jobStatus.state ~= 'CREATED' and observedObj.status.jobStatus.state ~= 'RECONCILING'
+        end

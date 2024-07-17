@@ -3,28 +3,18 @@ kind: PropagationPolicy
 metadata:
   name: nginx-propagation
 spec:
-  failover:
-    application:
-      decisionConditions:
-        tolerationSeconds: 90
-      purgeMode: Graciously
-      gracePeriodSeconds: 10    
   resourceSelectors:
     - apiVersion: apps/v1
       kind: Deployment
       name: nginx
-  propagateDeps: true
   placement:
     clusterAffinity:
       clusterNames:
         - member1
         - member2
+        - member3
     replicaScheduling:
-      replicaDivisionPreference: Aggregated
+      replicaDivisionPreference: Weighted
       replicaSchedulingType: Divided
-    spreadConstraints:
-      - spreadByField: cluster
-        maxGroups: 1
-        minGroups: 1
-
-      
+      weightPreference:
+        dynamicWeight: AvailableReplicas
