@@ -332,6 +332,9 @@ type FailoverHistoryItem struct {
 
 	// OriginCluster denotes the name of the cluster from which the workload was failed over.
 	OriginCluster string `json:"originCluster,omitempty"`
+
+	// Reason denotes the reason why the workload failed over.
+	Reason string `json:"reason,omitempty"`
 }
 
 // AggregatedStatusItem represents status of the resource running in a member cluster.

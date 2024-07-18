@@ -171,6 +171,7 @@ func (c *RBApplicationFailoverController) updateFailoverStatus(binding *workv1al
 			failoverHistoryItem := workv1alpha2.FailoverHistoryItem{
 				FailoverTime:  &currentTime,
 				OriginCluster: cluster,
+				Reason:        "ApplicationFailover",
 			}
 			binding.Status.FailoverHistory = append(binding.Status.FailoverHistory, failoverHistoryItem)
 			klog.V(4).Infof("Failover history is %+v", binding.Status.FailoverHistory)
