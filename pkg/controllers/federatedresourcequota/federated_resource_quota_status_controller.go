@@ -19,6 +19,7 @@ package federatedresourcequota
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"sort"
 
@@ -161,6 +162,7 @@ func (c *StatusController) collectQuotaStatus(quota *policyv1alpha1.FederatedRes
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		_, err = helper.UpdateStatus(context.Background(), c.Client, quota, func() error {
+			fmt.Println("AD: removing the quota status update")
 			quota.Status = *quotaStatus
 			return nil
 		})

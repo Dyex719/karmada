@@ -76,15 +76,17 @@ func AggregateResourceBindingWorkStatus(
 	var operationResult controllerutil.OperationResult
 	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		operationResult, err = UpdateStatus(context.Background(), c, binding, func() error {
-			fmt.Printf("AggregateStatus is %+v", aggregatedStatuses)
-			binding.Status.AggregatedStatus = aggregatedStatuses
+			// fmt.Printf("AggregateStatus is %+v\n", aggregatedStatuses)
+			aggItem := workv1alpha2.AggregatedStatusItem{ClusterName: "DEFAULT"}
+			aggregatedStatuses2 := []workv1alpha2.AggregatedStatusItem{aggItem}
+			binding.Status.AggregatedStatus = aggregatedStatuses2
 			currentTime := metav1.Now()
 			failoverHistoryItem := workv1alpha2.FailoverHistoryItem{
 				FailoverTime:  &currentTime,
 				OriginCluster: "WORKSTATUS",
 			}
 			binding.Status.FailoverHistory = []workv1alpha2.FailoverHistoryItem{failoverHistoryItem}
-			fmt.Printf("Failover history is %+v", binding.Status.FailoverHistory)
+			fmt.Printf("Failover history is %+v\n", binding.Status.FailoverHistory)
 			// set binding status with the newest condition
 			meta.SetStatusCondition(&binding.Status.Conditions, fullyAppliedCondition)
 			return nil
@@ -97,7 +99,8 @@ func AggregateResourceBindingWorkStatus(
 	}
 
 	if operationResult == controllerutil.OperationResultUpdatedStatusOnly {
-		msg := fmt.Sprintf("Update ResourceBinding(%s/%s) with AggregatedStatus successfully.", binding.Namespace, binding.Name)
+		msg := fmt.Sprintf("Update ResourceBinding(%s/%s) with AggregatedStatus successfully.\n", binding.Namespace, binding.Name)
+		fmt.Printf("ResourceBinding after success message is: %+v\n", binding)
 		eventRecorder.Event(binding, corev1.EventTypeNormal, events.EventReasonAggregateStatusSucceed, msg)
 		eventRecorder.Event(resourceTemplate, corev1.EventTypeNormal, events.EventReasonAggregateStatusSucceed, msg)
 	} else {
@@ -129,6 +132,8 @@ func AggregateClusterResourceBindingWorkStatus(
 	var operationResult controllerutil.OperationResult
 	if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		operationResult, err = UpdateStatus(context.Background(), c, binding, func() error {
+			fmt.Println("CLUSTER RESOURCE BINDINGS:")
+			fmt.Printf("Aggregate status is %+v\n", aggregatedStatuses)
 			binding.Status.AggregatedStatus = aggregatedStatuses
 			// set binding status with the newest condition
 			meta.SetStatusCondition(&binding.Status.Conditions, fullyAppliedCondition)

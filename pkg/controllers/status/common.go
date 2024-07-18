@@ -142,5 +142,6 @@ func updateResourceStatus(
 		return err
 	}
 	klog.V(3).Infof("Update resource(%s/%s/%s) status successfully.", gvr, resource.GetNamespace(), resource.GetName())
+
 	return nil
 }
