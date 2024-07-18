@@ -154,9 +154,36 @@ func mergeTargetClusters(targetClusters []workv1alpha2.TargetCluster, requiredBy
 	return targetClusters
 }
 
+func checkFailoverCondition(resourceBinding *workv1alpha2.ResourceBinding) string {
+	conditions := resourceBinding.Status.Conditions
+	for _, condition := range conditions {
+		if condition.Type == workv1alpha2.EvictionReasonTaintUntolerated {
+			klog.V(4).Info("EvictionReasonTaintUntolerated condition is true.")
+			return workv1alpha2.EvictionReasonTaintUntolerated
+		}
+		if condition.Type == workv1alpha2.EvictionReasonApplicationFailure {
+			klog.V(4).Info("EvictionReasonApplicationFailure condition is true.")
+			return workv1alpha2.EvictionReasonApplicationFailure
+		}
+	}
+	return ""
+}
+
 func mergeLabel(workload *unstructured.Unstructured, binding metav1.Object, scope apiextensionsv1.ResourceScope) map[string]string {
 	var workLabel = make(map[string]string)
 	if scope == apiextensionsv1.NamespaceScoped {
+		klog.V(4).Info("Checking for failover condition.")
+		namespaceBindingObj := binding.(*workv1alpha2.ResourceBinding)
+		failoverReason := checkFailoverCondition(namespaceBindingObj)
+		if failoverReason != "" {
+			if failoverReason == workv1alpha2.EvictionReasonApplicationFailure {
+				klog.V(4).Info("Appending application failover label!")
+				util.MergeLabel(workload, "resourcebinding.karmada.io/applicationFailover", "true")
+			} else if failoverReason == workv1alpha2.EvictionReasonApplicationFailure {
+				klog.V(4).Info("Appending cluster failover label!")
+				util.MergeLabel(workload, "resourcebinding.karmada.io/clusterFailover", "true")
+			}
+		}
 		bindingID := util.GetLabelValue(binding.GetLabels(), workv1alpha2.ResourceBindingPermanentIDLabel)
 		util.MergeLabel(workload, workv1alpha2.ResourceBindingPermanentIDLabel, bindingID)
 		workLabel[workv1alpha2.ResourceBindingPermanentIDLabel] = bindingID

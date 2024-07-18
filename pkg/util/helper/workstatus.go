@@ -78,6 +78,13 @@ func AggregateResourceBindingWorkStatus(
 		operationResult, err = UpdateStatus(context.Background(), c, binding, func() error {
 			binding.Status.AggregatedStatus = aggregatedStatuses
 			// set binding status with the newest condition
+			// currentTime := metav1.Now()
+			// failoverHistoryItem := workv1alpha2.FailoverHistoryItem{
+			// 	FailoverTime:  &currentTime,
+			// 	OriginCluster: "WORKSTATUS",
+			// }
+			// binding.Status.FailoverHistory = []workv1alpha2.FailoverHistoryItem{failoverHistoryItem}
+			// fmt.Printf("Failover history is %+v", binding.Status.FailoverHistory)
 			meta.SetStatusCondition(&binding.Status.Conditions, fullyAppliedCondition)
 			return nil
 		})

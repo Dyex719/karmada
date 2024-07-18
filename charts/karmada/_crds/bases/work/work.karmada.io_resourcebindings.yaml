@@ -113,6 +113,16 @@ spec:
             description: Status represents the most recently observed status of the
               ResourceBinding.
             properties:
+              failoverHistory:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    failoverTime:
+                      type: string
+                      format: date-time
+                    originCluster:
+                      type: string
               aggregatedStatus:
                 description: AggregatedStatus represents status list of the resource
                   running in each member cluster.
@@ -1180,6 +1190,16 @@ spec:
             description: Status represents the most recently observed status of the
               ResourceBinding.
             properties:
+              failoverHistory:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    failoverTime:
+                      type: string
+                      format: date-time
+                    originCluster:
+                      type: string
               aggregatedStatus:
                 description: AggregatedStatus represents status list of the resource
                   running in each member cluster.
