@@ -23,12 +23,10 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	controllerruntime "sigs.k8s.io/controller-runtime"
@@ -41,6 +39,7 @@ import (
 	configv1alpha1 "github.com/karmada-io/karmada/pkg/apis/config/v1alpha1"
 	policyv1alpha1 "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1"
 	workv1alpha2 "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2"
+	controllerUtils "github.com/karmada-io/karmada/pkg/controllers/utils"
 	"github.com/karmada-io/karmada/pkg/features"
 	"github.com/karmada-io/karmada/pkg/resourceinterpreter"
 	"github.com/karmada-io/karmada/pkg/sharedcli/ratelimiterflag"
@@ -154,43 +153,44 @@ func (c *RBApplicationFailoverController) syncBinding(binding *workv1alpha2.Reso
 	return time.Duration(duration) * time.Second, nil
 }
 
-func (c *RBApplicationFailoverController) updateFailoverStatus(binding *workv1alpha2.ResourceBinding, cluster string) (err error) {
-	message := fmt.Sprintf("Failover triggered for replica on cluster %s", cluster)
-	newFailoverAppliedCondition := metav1.Condition{
-		Type:               workv1alpha2.EvictionReasonApplicationFailure,
-		Status:             metav1.ConditionTrue,
-		Reason:             "ApplicationFailoverSuccessful",
-		Message:            message,
-		LastTransitionTime: metav1.Now(),
-	}
+// func (c *RBApplicationFailoverController) updateFailoverStatus(binding *workv1alpha2.ResourceBinding, cluster string) (err error) {
+// 	message := fmt.Sprintf("Failover triggered for replica on cluster %s", cluster)
+// 	newFailoverAppliedCondition := metav1.Condition{
+// 		Type:               workv1alpha2.EvictionReasonApplicationFailure,
+// 		Status:             metav1.ConditionTrue,
+// 		Reason:             "ApplicationFailoverSuccessful",
+// 		Message:            message,
+// 		LastTransitionTime: metav1.Now(),
+// 	}
 
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() (err error) {
-		_, err = helper.UpdateStatus(context.Background(), c.Client, binding, func() error {
-			// set binding status with the newest condition
-			currentTime := metav1.Now()
-			failoverHistoryItem := workv1alpha2.FailoverHistoryItem{
-				FailoverTime:  &currentTime,
-				OriginCluster: cluster,
-				Reason:        "ApplicationFailover",
-			}
-			binding.Status.FailoverHistory = append(binding.Status.FailoverHistory, failoverHistoryItem)
-			klog.V(4).Infof("Failover history is %+v", binding.Status.FailoverHistory)
-			meta.SetStatusCondition(&binding.Status.Conditions, newFailoverAppliedCondition)
-			return nil
-		})
-		return err
-	})
+// 	err = retry.RetryOnConflict(retry.DefaultRetry, func() (err error) {
+// 		_, err = helper.UpdateStatus(context.Background(), c.Client, binding, func() error {
+// 			// set binding status with the newest condition
+// 			currentTime := metav1.Now()
+// 			failoverHistoryItem := workv1alpha2.FailoverHistoryItem{
+// 				FailoverTime:  &currentTime,
+// 				OriginCluster: cluster,
+// 				Reason:        "ApplicationFailover",
+// 			}
+// 			binding.Status.FailoverHistory = append(binding.Status.FailoverHistory, failoverHistoryItem)
+// 			klog.V(4).Infof("Failover history is %+v", binding.Status.FailoverHistory)
+// 			meta.SetStatusCondition(&binding.Status.Conditions, newFailoverAppliedCondition)
+// 			return nil
+// 		})
+// 		return err
+// 	})
 
-	if err != nil {
-		klog.Errorf("Failed to update condition of binding %s/%s: %s", binding.Namespace, binding.Name, err.Error())
-	}
-	return nil
-}
+// 	if err != nil {
+// 		klog.Errorf("Failed to update condition of binding %s/%s: %s", binding.Namespace, binding.Name, err.Error())
+// 	}
+// 	return nil
+// }
 
 func (c *RBApplicationFailoverController) evictBinding(binding *workv1alpha2.ResourceBinding, clusters []string) error {
 	for _, cluster := range clusters {
-		klog.V(4).Info("Updating resource binding with latest failover timestamp for cluster %s.", cluster)
-		updateerr := c.updateFailoverStatus(binding, cluster)
+		klog.V(4).Infof("Updating resource binding with latest failover timestamp for cluster %s.", cluster)
+
+		updateerr := controllerUtils.UpdateFailoverStatus(c.Client, binding, cluster, workv1alpha2.EvictionReasonApplicationFailure)
 		if updateerr != nil {
 			klog.Errorf("Failed to update status with failover information.")
 		}

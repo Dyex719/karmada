@@ -22,13 +22,10 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +33,7 @@ import (
 
 	clusterv1alpha1 "github.com/karmada-io/karmada/pkg/apis/cluster/v1alpha1"
 	workv1alpha2 "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2"
+	controllerUtils "github.com/karmada-io/karmada/pkg/controllers/utils"
 	"github.com/karmada-io/karmada/pkg/features"
 	"github.com/karmada-io/karmada/pkg/util"
 	"github.com/karmada-io/karmada/pkg/util/fedinformer/keys"
@@ -140,39 +138,6 @@ func (tc *NoExecuteTaintManager) Start(ctx context.Context) error {
 	return nil
 }
 
-func (tc *NoExecuteTaintManager) updateFailoverStatus(binding *workv1alpha2.ResourceBinding, cluster string) (err error) {
-	message := fmt.Sprintf("Failover triggered for replica on cluster %s", cluster)
-	newFailoverAppliedCondition := metav1.Condition{
-		Type:               workv1alpha2.EvictionReasonTaintUntolerated,
-		Status:             metav1.ConditionTrue,
-		Reason:             "ClusterFailoverSuccessful",
-		Message:            message,
-		LastTransitionTime: metav1.Now(),
-	}
-
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() (err error) {
-		_, err = helper.UpdateStatus(context.Background(), tc.Client, binding, func() error {
-			// set binding status with the newest condition
-			currentTime := metav1.Now()
-			failoverHistoryItem := workv1alpha2.FailoverHistoryItem{
-				FailoverTime:  &currentTime,
-				OriginCluster: cluster,
-				Reason:        "ClusterFailover",
-			}
-			binding.Status.FailoverHistory = append(binding.Status.FailoverHistory, failoverHistoryItem)
-			klog.V(4).Infof("Failover history is %+v", binding.Status.FailoverHistory)
-			meta.SetStatusCondition(&binding.Status.Conditions, newFailoverAppliedCondition)
-			return nil
-		})
-		return err
-	})
-
-	if err != nil {
-		klog.Errorf("Failed to update condition of binding %s/%s: %s", binding.Namespace, binding.Name, err.Error())
-	}
-	return nil
-}
-
 func (tc *NoExecuteTaintManager) syncBindingEviction(key util.QueueKey) error {
 	fedKey, ok := key.(keys.FederatedKey)
 	if !ok {
@@ -207,7 +172,7 @@ func (tc *NoExecuteTaintManager) syncBindingEviction(key util.QueueKey) error {
 	// Case 3: Tolerate forever, we do nothing.
 	if needEviction || tolerationTime == 0 {
 		klog.V(4).Info("Updating resource binding: %s with latest failover information %s.", binding.Name, cluster)
-		updateErr := tc.updateFailoverStatus(binding, cluster)
+		updateErr := controllerUtils.UpdateFailoverStatus(tc.Client, binding, cluster, workv1alpha2.EvictionReasonTaintUntolerated)
 		if updateErr != nil {
 			klog.Errorf("Failed to update status with failover information")
 		}
