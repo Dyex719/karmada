@@ -171,7 +171,7 @@ func (tc *NoExecuteTaintManager) syncBindingEviction(key util.QueueKey) error {
 	// Case 2: Need eviction after toleration time. If time is up, do eviction right now.
 	// Case 3: Tolerate forever, we do nothing.
 	if needEviction || tolerationTime == 0 {
-		klog.V(4).Info("Updating resource binding: %s with latest failover information %s.", binding.Name, cluster)
+		klog.V(4).Infof("Updating resource binding: %s with latest failover information %s.", binding.Name, cluster)
 		updateErr := controllerUtils.UpdateFailoverStatus(tc.Client, binding, cluster, workv1alpha2.EvictionReasonTaintUntolerated)
 		if updateErr != nil {
 			klog.Errorf("Failed to update status with failover information")

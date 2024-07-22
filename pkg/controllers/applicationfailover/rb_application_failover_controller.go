@@ -153,39 +153,6 @@ func (c *RBApplicationFailoverController) syncBinding(binding *workv1alpha2.Reso
 	return time.Duration(duration) * time.Second, nil
 }
 
-// func (c *RBApplicationFailoverController) updateFailoverStatus(binding *workv1alpha2.ResourceBinding, cluster string) (err error) {
-// 	message := fmt.Sprintf("Failover triggered for replica on cluster %s", cluster)
-// 	newFailoverAppliedCondition := metav1.Condition{
-// 		Type:               workv1alpha2.EvictionReasonApplicationFailure,
-// 		Status:             metav1.ConditionTrue,
-// 		Reason:             "ApplicationFailoverSuccessful",
-// 		Message:            message,
-// 		LastTransitionTime: metav1.Now(),
-// 	}
-
-// 	err = retry.RetryOnConflict(retry.DefaultRetry, func() (err error) {
-// 		_, err = helper.UpdateStatus(context.Background(), c.Client, binding, func() error {
-// 			// set binding status with the newest condition
-// 			currentTime := metav1.Now()
-// 			failoverHistoryItem := workv1alpha2.FailoverHistoryItem{
-// 				FailoverTime:  &currentTime,
-// 				OriginCluster: cluster,
-// 				Reason:        "ApplicationFailover",
-// 			}
-// 			binding.Status.FailoverHistory = append(binding.Status.FailoverHistory, failoverHistoryItem)
-// 			klog.V(4).Infof("Failover history is %+v", binding.Status.FailoverHistory)
-// 			meta.SetStatusCondition(&binding.Status.Conditions, newFailoverAppliedCondition)
-// 			return nil
-// 		})
-// 		return err
-// 	})
-
-// 	if err != nil {
-// 		klog.Errorf("Failed to update condition of binding %s/%s: %s", binding.Namespace, binding.Name, err.Error())
-// 	}
-// 	return nil
-// }
-
 func (c *RBApplicationFailoverController) evictBinding(binding *workv1alpha2.ResourceBinding, clusters []string) error {
 	for _, cluster := range clusters {
 		klog.V(4).Infof("Updating resource binding with latest failover timestamp for cluster %s.", cluster)
