@@ -178,12 +178,12 @@ func mergeLabel(workload *unstructured.Unstructured, binding metav1.Object, scop
 		if failoverReason != "" {
 			if failoverReason == workv1alpha2.EvictionReasonApplicationFailure {
 				klog.V(4).Info("Appending application failover label")
-				util.MergeLabel(workload, workv1alpha2.ResourceBindingApplicationFailoverLabel, "true")
-				workLabel[workv1alpha2.ResourceBindingApplicationFailoverLabel] = "true"
+				util.MergeLabel(workload, workv1alpha2.ResourceBindingFailoverLabel, "application")
+				workLabel[workv1alpha2.ResourceBindingFailoverLabel] = "application"
 			} else if failoverReason == workv1alpha2.EvictionReasonTaintUntolerated {
 				klog.V(4).Info("Appending cluster failover label")
-				util.MergeLabel(workload, workv1alpha2.ResourceBindingClusterFailoverLabel, "true")
-				workLabel[workv1alpha2.ResourceBindingClusterFailoverLabel] = "true"
+				util.MergeLabel(workload, workv1alpha2.ResourceBindingFailoverLabel, "cluster")
+				workLabel[workv1alpha2.ResourceBindingFailoverLabel] = "cluster"
 			}
 		}
 		bindingID := util.GetLabelValue(binding.GetLabels(), workv1alpha2.ResourceBindingPermanentIDLabel)

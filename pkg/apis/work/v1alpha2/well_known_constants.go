@@ -145,6 +145,5 @@ const (
 
 // Define failover labels.
 const (
-	ResourceBindingApplicationFailoverLabel = "resourcebinding.karmada.io/applicationFailover"
-	ResourceBindingClusterFailoverLabel     = "resourcebinding.karmada.io/clusterFailover"
+	ResourceBindingFailoverLabel = "resourcebinding.karmada.io/failover-type"
 )

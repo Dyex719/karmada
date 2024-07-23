@@ -157,8 +157,7 @@ func (c *RBApplicationFailoverController) evictBinding(binding *workv1alpha2.Res
 	for _, cluster := range clusters {
 		klog.V(4).Infof("Updating resource binding with latest failover timestamp for cluster %s.", cluster)
 
-		updateerr := controllerUtils.UpdateFailoverStatus(c.Client, binding, cluster, workv1alpha2.EvictionReasonApplicationFailure)
-		if updateerr != nil {
+		if err := controllerUtils.UpdateFailoverStatus(c.Client, binding, cluster, workv1alpha2.EvictionReasonApplicationFailure); err != nil {
 			klog.Errorf("Failed to update status with failover information.")
 		}
 		switch binding.Spec.Failover.Application.PurgeMode {
