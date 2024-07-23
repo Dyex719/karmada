@@ -155,16 +155,21 @@ func mergeTargetClusters(targetClusters []workv1alpha2.TargetCluster, requiredBy
 }
 
 func checkFailoverCondition(resourceBinding *workv1alpha2.ResourceBinding) string {
-	conditions := resourceBinding.Status.Conditions
-	for _, condition := range conditions {
-		if condition.Type == workv1alpha2.EvictionReasonTaintUntolerated {
-			klog.V(4).Info("EvictionReasonTaintUntolerated condition is true.")
-			return workv1alpha2.EvictionReasonTaintUntolerated
-		}
-		if condition.Type == workv1alpha2.EvictionReasonApplicationFailure {
-			klog.V(4).Info("EvictionReasonApplicationFailure condition is true.")
-			return workv1alpha2.EvictionReasonApplicationFailure
-		}
+	failoverHistory := resourceBinding.Status.FailoverHistory
+	klog.V(4).Infof("Failover History is %+v", failoverHistory)
+	if len(failoverHistory) == 0 {
+		return ""
+	}
+
+	lastFailover := failoverHistory[len(failoverHistory)-1]
+	klog.V(4).Infof("Latest failover item is %+v", lastFailover) // AD: check
+	if lastFailover.Reason == "ClusterFailover" {
+		klog.V(4).Info("The latest failover was due to a ClusterFailover.")
+		return workv1alpha2.EvictionReasonTaintUntolerated
+	}
+	if lastFailover.Reason == "ApplicationFailover" {
+		klog.V(4).Info("The latest failover was due to a ApplicationFailover.")
+		return workv1alpha2.EvictionReasonApplicationFailure
 	}
 	return ""
 }

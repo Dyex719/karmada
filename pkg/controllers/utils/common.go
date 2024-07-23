@@ -47,7 +47,16 @@ func UpdateFailoverStatus(client client.Client, binding *workv1alpha2.ResourceBi
 			}
 			binding.Status.FailoverHistory = append(binding.Status.FailoverHistory, failoverHistoryItem)
 			klog.V(4).Infof("Failover history is %+v", binding.Status.FailoverHistory)
-			meta.SetStatusCondition(&binding.Status.Conditions, newFailoverAppliedCondition)
+			existingCondition := meta.FindStatusCondition(binding.Status.Conditions, failoverType)
+			if existingCondition != nil && newFailoverAppliedCondition.Message == existingCondition.Message { //check
+				// SetStatusCondition only updates if new status differs from the old status
+				// Update the time here as the status will not change if multiple failovers of the same failoverType occur
+				existingCondition.LastTransitionTime = metav1.Now()
+			} else {
+				meta.SetStatusCondition(&binding.Status.Conditions, newFailoverAppliedCondition)
+			}
+			binding.Spec.RemoveCluster(cluster)
+			klog.V(4).Infof("Removing cluster %s from binding. Remaining clusters are %+v", cluster, binding.Spec.Clusters)
 			return nil
 		})
 		return err
