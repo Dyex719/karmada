@@ -10,11 +10,41 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	policyv1alpha1 "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1"
 	workv1alpha2 "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func restrictFailoverHistoryInfo(binding *workv1alpha2.ResourceBinding) bool {
+	placement := binding.Spec.Placement
+	// Check if replica scheduling type is Duplicated
+	if placement.ReplicaScheduling.ReplicaSchedulingType == policyv1alpha1.ReplicaSchedulingTypeDuplicated {
+		return true
+	}
+
+	// Check if replica scheduling type is Divided with no spread constraints or invalid spread constraints
+	if placement.ReplicaScheduling.ReplicaSchedulingType == policyv1alpha1.ReplicaSchedulingTypeDivided {
+		if len(placement.SpreadConstraints) == 0 {
+			return true
+		}
+
+		for _, spreadConstraint := range placement.SpreadConstraints {
+			if spreadConstraint.SpreadByLabel != "" {
+				return true
+			}
+			if spreadConstraint.SpreadByField == "cluster" && (spreadConstraint.MaxGroups > 1 || spreadConstraint.MinGroups > 1) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
 func UpdateFailoverStatus(client client.Client, binding *workv1alpha2.ResourceBinding, cluster string, failoverType string) (err error) {
+	if restrictFailoverHistoryInfo(binding) {
+		return nil
+	}
 	message := fmt.Sprintf("Failover triggered for replica on cluster %s", cluster)
 
 	var reason string
@@ -55,7 +85,6 @@ func UpdateFailoverStatus(client client.Client, binding *workv1alpha2.ResourceBi
 			} else {
 				meta.SetStatusCondition(&binding.Status.Conditions, newFailoverAppliedCondition)
 			}
-			binding.Spec.RemoveCluster(cluster)
 			klog.V(4).Infof("Removing cluster %s from binding. Remaining clusters are %+v", cluster, binding.Spec.Clusters)
 			return nil
 		})
