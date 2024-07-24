@@ -4,15 +4,17 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/karmada-io/karmada/pkg/util/helper"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/karmada-io/karmada/pkg/util/helper"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	policyv1alpha1 "github.com/karmada-io/karmada/pkg/apis/policy/v1alpha1"
 	workv1alpha2 "github.com/karmada-io/karmada/pkg/apis/work/v1alpha2"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func restrictFailoverHistoryInfo(binding *workv1alpha2.ResourceBinding) bool {
