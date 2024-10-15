@@ -143,6 +143,8 @@ endif
 
 # Build and package binary
 #
+# This is a test
+#
 # Example
 #   make release-karmadactl
 #   make release-kubectl-karmada
